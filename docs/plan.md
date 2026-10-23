@@ -71,12 +71,13 @@ As in the other sims, what is likely to be changed lives in JSON with its schema
 
 ## Milestones
 
-1. **Scaffold.** Vite + TypeScript + three.js, Vitest, ESLint, CI on GitHub Actions with the badge,
-   deploy to GitHub Pages; a private repo. Copy `terrain.ts`, `sun.ts`, the terrain view and
-   the sky from driving-sim. Only the detail tiles over the lava field plus a margin (about 25 × 20
-   km), not the whole island. Free camera over today's island.
-2. **Lava data.** `fetch-lava.ts`, GEODE → GeoJSON in the site frame → per-episode masks. Digitise the
-   5 phases and the vents. Tests: outline areas match the published 145 km² within a few %.
+1. ~~**Scaffold.** Vite + TypeScript + three.js, Vitest, ESLint, CI on GitHub Actions with the badge;
+   a private repo. Copy `terrain.ts`, `sun.ts`, the terrain view and the sky from driving-sim. Only
+   the detail tiles near the lava field (75 tiles, 87 MB), not the whole island. Free camera over
+   today's island.~~ ✅ Deploy waits: GitHub Pages needs a public repo on this plan.
+2. **Lava data.** ~~`fetch-lava.ts`, GEODE → the site frame → per-episode overlay.~~ ✅ ~~The vents by
+   phase (`public/data/vents.json`).~~ ✅ ~~Tests: areas match the published ~146 km².~~ ✅ Still to do:
+   split episode 2 into phases 2, 3 and 4 by hand.
 3. **Clock and lava.** Timeline from 1 Sep 1730 to Apr 1736 with a scrubber; arrival-time rasters;
    lava shader (glowing front, crust, cooled black); vent glow and fountains.
 4. **Before.** The lowered DEM and the farmland texture inside the outline, blended back to today as the

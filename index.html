@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>Timanfaya 1730</title>
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,700;1,500&family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;600&display=swap" rel="stylesheet" />
+  </head>
+  <body>
+    <canvas id="view"></canvas>
+    <div id="labels"></div>
+
+    <div id="loading">
+      <div class="title">Timanfaya <span>1730</span></div>
+      <div class="loading-line">Cargando la isla…</div>
+    </div>
+
+    <header id="masthead">
+      <h1>Timanfaya <span>1730–1736</span></h1>
+      <p>La erupción que cubrió una cuarta parte de Lanzarote, sobre el terreno real.</p>
+    </header>
+
+    <details id="legend" open>
+      <summary><h2>El campo de lava</h2></summary>
+      <ul id="episodes"></ul>
+      <label class="row"><input type="checkbox" id="vents" checked /> Bocas eruptivas</label>
+      <label class="row slider">Opacidad <input type="range" id="opacity" min="0" max="1" step="0.05" /></label>
+      <p class="note">Según el mapa geológico GEODE del IGME, que distingue tres episodios. El 2 reúne las fases 2 a 4 del relato histórico.</p>
+    </details>
+
+    <footer id="credits">
+      Terreno MDT05 y PNOA © <a href="https://www.ign.es">IGN</a> (CC BY 4.0) · Geología © <a href="https://info.igme.es/cartografiadigital/geologica/geode.aspx">IGME GEODE</a> · Cumbres © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a><span id="sha"></span>
+    </footer>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

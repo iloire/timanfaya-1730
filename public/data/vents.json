@@ -1,0 +1,15 @@
+{
+  "source": "Vents by phase: Muller & Longpré 2024 (Bull. Volcanol. 86), after Carracedo et al. 1992. Positions: the summit of the cone in OpenStreetMap (natural=volcano).",
+  "vents": [
+    { "name": "Caldera de los Cuervos", "phase": 1, "lat": 28.99103, "lon": -13.69389, "osm": "Montaña de las Lapas o del Cuervo" },
+    { "name": "Caldera de Santa Catalina", "phase": 1, "lat": 29.00443, "lon": -13.70505, "osm": "Caldera de la Rilla" },
+    { "name": "Pico Partido", "phase": 1, "lat": 29.0084, "lon": -13.71926 },
+    { "name": "Montaña del Señalo", "phase": 2, "lat": 29.00301, "lon": -13.71635 },
+    { "name": "El Quemado", "phase": 3, "lat": 28.98864, "lon": -13.8126, "osm": "Montaña Quemada" },
+    { "name": "Montaña Rajada", "phase": 3, "lat": 28.99493, "lon": -13.77366 },
+    { "name": "Calderas Quemadas", "phase": 3, "lat": 28.99825, "lon": -13.75313, "osm": "Caldera Quemada de Arriba" },
+    { "name": "Montañas del Fuego", "phase": 4, "lat": 28.99807, "lon": -13.74494, "osm": "Montaña de Timanfaya" },
+    { "name": "Montaña de las Nueces", "phase": 5, "lat": 29.0068, "lon": -13.68836 },
+    { "name": "Montaña Colorada", "phase": 5, "lat": 29.0058, "lon": -13.6778 }
+  ]
+}

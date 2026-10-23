@@ -1,0 +1,177 @@
+// Downloads the open IGN data for a site and writes the files the piece loads:
+//   height.bin — Int16 little-endian, heightmap.unitM metres a step (default 0.1),
+//                row 0 = north edge, sea = SEA_FLOOR_M
+//   ortho.jpg  — PNOA orthophoto over exactly the same bbox
+//   detail/    — the same pair at the DEM's native 5 m (and a sharper photo) for every square
+//                tile with land near the lava field, plus tiles.json listing them
+// The same pipeline as driving-sim's, without the roads and buildings: 1730 had neither. Run
+// fetch-lava first; it decides which tiles get the 5 m detail. Files already there are kept;
+// --refresh downloads everything again.
+// Usage: npm run fetch-terrain -- lanzarote
+//        npm run fetch-terrain -- lanzarote --refresh
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { fromArrayBuffer } from 'geotiff';
+import { bounds, type LavaFile } from '../src/sim/lava';
+
+const WCS = 'https://servicios.idee.es/wcs-inspire/mdt';
+const WMS = 'https://www.ign.es/wms-inspire/pnoa-ma';
+const NODATA = -32768;
+const SEA_FLOOR_M = -15; // 15 m below the water plane, so the coastline reads clearly
+const DEM_RES = 5; // MDT05 native resolution (m)
+/** A detail tile needs at least this much land to be worth fetching… */
+const MIN_LAND = 0.01;
+/** …and to lie within this distance of the lava field (the piece only gets close there). */
+const LAVA_MARGIN_M = 1500;
+
+interface SiteFile {
+  crs: string;
+  bbox: [number, number, number, number];
+  heightmap: { file: string; size: number; unitM?: number };
+  ortho: { file: string; size: number };
+  detail: { dir: string; tileM: number; orthoSize: number };
+  lava: { file: string };
+}
+
+// IGN answers the odd request with a 502 partway through a long run; retry those.
+async function download(url: string, tries = 4): Promise<ArrayBuffer> {
+  const res = await fetch(url);
+  if (res.ok) return res.arrayBuffer();
+  if (res.status >= 500 && tries > 1) {
+    await new Promise((r) => setTimeout(r, 5000));
+    return download(url, tries - 1);
+  }
+  throw new Error(`${res.status} ${res.statusText} for ${url}`);
+}
+
+// The WCS returns whole metres; a 3×3 box blur removes the 1 m terracing on gentle slopes.
+function smooth(src: Float32Array, n: number, isSea: Uint8Array): Float32Array {
+  const out = new Float32Array(src.length);
+  for (let y = 0; y < n; y++) {
+    for (let x = 0; x < n; x++) {
+      const i = y * n + x;
+      if (isSea[i]) { out[i] = src[i]; continue; }
+      let sum = 0, count = 0;
+      for (let dy = -1; dy <= 1; dy++) {
+        for (let dx = -1; dx <= 1; dx++) {
+          const xx = x + dx, yy = y + dy;
+          if (xx < 0 || yy < 0 || xx >= n || yy >= n) continue;
+          const j = yy * n + xx;
+          if (isSea[j]) continue;
+          sum += src[j]; count++;
+        }
+      }
+      out[i] = sum / count;
+    }
+  }
+  return out;
+}
+
+/**
+ * DEM over a square, as game-ready Int16 in `unitM` steps. `n` samples a side; omitting it takes
+ * the native 5 m grid with a one-pixel margin that is cropped after smoothing, so
+ * neighbouring tiles blur across their shared edge identically.
+ */
+async function fetchDem(epsg: string, unitM: number, x0: number, y0: number, x1: number, y1: number, n?: number): Promise<Int16Array> {
+  const m = n === undefined ? DEM_RES : 0;
+  let url = `${WCS}?SERVICE=WCS&REQUEST=GetCoverage&VERSION=2.0.1&CoverageId=Elevacion${epsg}_5` +
+    `&FORMAT=image/tiff&SUBSET=x(${x0 - m},${x1 + m})&SUBSET=y(${y0 - m},${y1 + m})`;
+  if (n !== undefined) url += `&SCALESIZE=x(${n}),y(${n})`;
+  const image = await (await fromArrayBuffer(await download(url))).getImage();
+  const w = image.getWidth();
+  if (image.getHeight() !== w) throw new Error(`expected a square DEM, got ${w}×${image.getHeight()}`);
+  const [raster] = (await image.readRasters()) as unknown as [ArrayLike<number>];
+  const raw = new Float32Array(w * w);
+  const isSea = new Uint8Array(w * w);
+  for (let i = 0; i < w * w; i++) {
+    const v = raster[i];
+    // Some IGN tiles store open sea as 0 m rather than nodata.
+    if (v === NODATA || v <= 0) { isSea[i] = 1; raw[i] = SEA_FLOOR_M; } else raw[i] = v;
+  }
+  const height = smooth(raw, w, isSea);
+  const crop = m ? 1 : 0;
+  const size = w - 2 * crop;
+  const out = new Int16Array(size * size);
+  for (let r = 0; r < size; r++) {
+    for (let c = 0; c < size; c++) {
+      const i = (r + crop) * w + c + crop;
+      const v = Math.round((isSea[i] ? SEA_FLOOR_M : height[i]) / unitM);
+      // An Int16Array would silently wrap a peak above 32767 steps (3276 m in decimetres).
+      if (v > 32767) throw new Error(`${(v * unitM).toFixed(0)} m is above the ${(32767 * unitM).toFixed(0)} m Int16 holds at ${unitM} m a step — raise heightmap.unitM`);
+      out[r * size + c] = v;
+    }
+  }
+  return out;
+}
+
+async function fetchOrtho(crs: string, x0: number, y0: number, x1: number, y1: number, size: number): Promise<Buffer> {
+  const url = `${WMS}?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&LAYERS=OI.OrthoimageCoverage&STYLES=` +
+    `&CRS=${crs}&BBOX=${x0},${y0},${x1},${y1}&WIDTH=${size}&HEIGHT=${size}&FORMAT=image/jpeg`;
+  return Buffer.from(await download(url));
+}
+
+/** Tiles (col from the west, row from the south) with land, near one of the lava field's polygons. */
+function pickTiles(site: SiteFile, base: Int16Array, lava: LavaFile): [number, number][] {
+  const { tileM } = site.detail;
+  const [x0, , x1] = site.bbox;
+  const extent = x1 - x0, n = site.heightmap.size, px = extent / n, unitM = site.heightmap.unitM ?? 0.1;
+  const boxes = lava.features.map((f) => bounds([f]));
+  const near = (col: number, row: number) => boxes.some(([bx0, by0, bx1, by1]) =>
+    col * tileM < bx1 + LAVA_MARGIN_M && (col + 1) * tileM > bx0 - LAVA_MARGIN_M &&
+    row * tileM < by1 + LAVA_MARGIN_M && (row + 1) * tileM > by0 - LAVA_MARGIN_M);
+  const tiles: [number, number][] = [];
+  const count = Math.round(extent / tileM);
+  for (let row = 0; row < count; row++) {
+    for (let col = 0; col < count; col++) {
+      if (!near(col, row)) continue;
+      let land = 0, total = 0;
+      for (let y = row * tileM; y < (row + 1) * tileM; y += px) {
+        for (let x = col * tileM; x < (col + 1) * tileM; x += px) {
+          const r = Math.min(Math.floor((extent - y) / px), n - 1), c = Math.floor(x / px);
+          total++;
+          if (base[r * n + c] * unitM > 5) land++;
+        }
+      }
+      if (land / total >= MIN_LAND) tiles.push([col, row]);
+    }
+  }
+  return tiles;
+}
+
+async function main(): Promise<void> {
+  const siteId = process.argv[2] ?? 'lanzarote';
+  const refresh = process.argv.includes('--refresh');
+  const dir = join('public', 'sites', siteId);
+  const site = JSON.parse(readFileSync(join(dir, 'site.json'), 'utf8')) as SiteFile;
+  const lava = JSON.parse(readFileSync(join(dir, site.lava.file), 'utf8')) as LavaFile;
+  const [x0, y0, x1, y1] = site.bbox;
+  const epsg = site.crs.split(':')[1];
+  const heightFile = join(dir, site.heightmap.file);
+  const unitM = site.heightmap.unitM ?? 0.1;
+  const fresh = (path: string) => refresh || !existsSync(path);
+
+  if (fresh(heightFile)) {
+    const n = site.heightmap.size;
+    console.log(`DEM ${n}×${n} from IGN MDT05 …`);
+    writeFileSync(heightFile, Buffer.from((await fetchDem(epsg, unitM, x0, y0, x1, y1, n)).buffer));
+    console.log(`Ortho ${site.ortho.size}² from PNOA …`);
+    writeFileSync(join(dir, site.ortho.file), await fetchOrtho(site.crs, x0, y0, x1, y1, site.ortho.size));
+  }
+
+  const { tileM, orthoSize } = site.detail;
+  const detailDir = join(dir, site.detail.dir);
+  mkdirSync(detailDir, { recursive: true });
+  const tiles = pickTiles(site, new Int16Array(readFileSync(heightFile).buffer.slice(0)), lava);
+  console.log(`${tiles.length} detail tiles of ${tileM / 1000} km at ${DEM_RES} m …`);
+  for (const [col, row] of tiles) {
+    const tx0 = x0 + col * tileM, ty0 = y0 + row * tileM;
+    const bin = join(detailDir, `${col}_${row}.bin`), jpg = join(detailDir, `${col}_${row}.jpg`);
+    if (fresh(bin)) writeFileSync(bin, Buffer.from((await fetchDem(epsg, unitM, tx0, ty0, tx0 + tileM, ty0 + tileM)).buffer));
+    if (fresh(jpg)) writeFileSync(jpg, await fetchOrtho(site.crs, tx0, ty0, tx0 + tileM, ty0 + tileM, orthoSize));
+    process.stdout.write('.');
+  }
+  writeFileSync(join(detailDir, 'tiles.json'), JSON.stringify({ size: tileM / DEM_RES, tiles }) + '\n');
+  console.log('\nDone');
+}
+
+main().catch((err) => { console.error(err); process.exit(1); });

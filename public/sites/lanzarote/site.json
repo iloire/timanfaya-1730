@@ -1,0 +1,11 @@
+{
+  "name": "Lanzarote",
+  "country": "Spain",
+  "proj4": "+proj=utm +zone=28 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs",
+  "crs": "EPSG:4083",
+  "bbox": [604000, 3181000, 658000, 3235000],
+  "heightmap": { "file": "height.bin", "size": 2048 },
+  "ortho": { "file": "ortho.jpg", "size": 4096 },
+  "detail": { "dir": "detail", "tileM": 3000, "orthoSize": 2048 },
+  "lava": { "file": "lava.json" }
+}
