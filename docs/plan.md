@@ -72,9 +72,9 @@ As in the other sims, what is likely to be changed lives in JSON with its schema
 ## Milestones
 
 1. ~~**Scaffold.** Vite + TypeScript + three.js, Vitest, ESLint, CI on GitHub Actions with the badge;
-   a private repo. Copy `terrain.ts`, `sun.ts`, the terrain view and the sky from driving-sim. Only
+   a public repo. Copy `terrain.ts`, `sun.ts`, the terrain view and the sky from driving-sim. Only
    the detail tiles near the lava field (75 tiles, 87 MB), not the whole island. Free camera over
-   today's island.~~ ✅ Deploy waits: GitHub Pages needs a public repo on this plan.
+   today's island.~~ ✅ Public, deployed to GitHub Pages on every push.
 2. **Lava data.** ~~`fetch-lava.ts`, GEODE → the site frame → per-episode overlay.~~ ✅ ~~The vents by
    phase (`public/data/vents.json`).~~ ✅ ~~Tests: areas match the published ~146 km².~~ ✅ Still to do:
    split episode 2 into phases 2, 3 and 4 by hand.

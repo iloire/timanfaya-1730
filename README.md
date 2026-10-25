@@ -38,8 +38,9 @@ CI runs the same three on every push to `main` and every pull request.
 
 ## Deploy
 
-Not yet. The repo is private, and GitHub Pages needs a public repo on this plan. The build is a
-static site (`dist/`, ~100 MB with the terrain), so any static host will do once it's decided.
+Every push to `main` builds and deploys to GitHub Pages: <https://iloire.github.io/timanfaya-1730/>.
+The CI badge goes green only once that commit is live and the page, the lava and a terrain tile
+answer on the real URL.
 
 ## Data
 
